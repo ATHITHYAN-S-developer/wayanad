@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wayanad Trip Expense Manager</title>
+  <meta name="description" content="Manage and split trip expenses easily for your Wayanad group trip." />
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Firebase Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar navbar-expand-lg glass-nav sticky-top">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand fw-800 gradient-text d-flex align-items-center gap-2">
+      <i class="bi bi-tree-fill text-success"></i> Wayanad Trip Manager
+    </span>
+    <div class="d-flex align-items-center gap-3 ms-auto">
+      <!-- Firebase sync status -->
+      <span id="syncStatus" class="sync-pill sync-connecting" title="Firebase sync status">
+        <span class="sync-dot"></span>
+        <span id="syncLabel">Connecting...</span>
+      </span>
+      <button id="themeToggle" class="btn btn-sm glass-btn" title="Toggle Theme">
+        <i class="bi bi-moon-stars-fill"></i>
+      </button>
+      <button class="btn btn-sm glass-btn" data-bs-toggle="modal" data-bs-target="#importExportModal" title="Import/Export">
+        <i class="bi bi-arrow-left-right"></i>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== HERO BANNER ===== -->
+<div class="hero-banner">
+  <div class="hero-content container-fluid px-4">
+    <h1 class="hero-title">🌿 Wayanad Trip</h1>
+    <p class="hero-sub">Split expenses, track payments, stay fair</p>
+  </div>
+</div>
+
+<div class="container-fluid px-4 py-4">
+
+  <!-- ===== TRIP INFO CARD ===== -->
+  <div class="glass-card mb-4">
+    <div class="card-header-custom">
+      <i class="bi bi-gear-fill me-2 text-primary"></i> Trip Configuration
+    </div>
+    <div class="card-body-custom">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label label-styled">Trip Name</label>
+          <input type="text" id="tripName" class="form-control input-glass" value="Wayanad Trip" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label label-styled">Total Trip Cost (₹)</label>
+          <input type="number" id="totalCost" class="form-control input-glass" value="0" min="0" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label label-styled">Number of Members</label>
+          <input type="number" id="numMembers" class="form-control input-glass" value="15" min="1" />
+        </div>
+      </div>
+      <div class="row g-3 mt-1">
+        <div class="col-md-4">
+          <div class="info-pill">
+            <span class="pill-label">Cost Per Person</span>
+            <span class="pill-value" id="costPerPerson">₹0</span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="info-pill">
+            <span class="pill-label">Total Collected</span>
+            <span class="pill-value text-success" id="totalCollected">₹0</span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="info-pill">
+            <span class="pill-label">Remaining</span>
+            <span class="pill-value text-warning" id="remainingAmt">₹0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DASHBOARD CARDS ===== -->
+  <div class="row g-3 mb-4" id="dashboardCards">
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-blue">
+        <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+        <div class="stat-val" id="statMembers">0</div>
+        <div class="stat-label">Total Members</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-purple">
+        <div class="stat-icon"><i class="bi bi-currency-rupee"></i></div>
+        <div class="stat-val" id="statExpense">₹0</div>
+        <div class="stat-label">Total Expense</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-teal">
+        <div class="stat-icon"><i class="bi bi-person-check-fill"></i></div>
+        <div class="stat-val" id="statPerPerson">₹0</div>
+        <div class="stat-label">Cost Per Person</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-green">
+        <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
+        <div class="stat-val" id="statPaid">₹0</div>
+        <div class="stat-label">Amount Paid</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PROGRESS BAR ===== -->
+  <div class="glass-card mb-4">
+    <div class="card-body-custom">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="label-styled">Settlement Progress</span>
+        <span class="pill-value" id="settledCount">0 / 0 Settled</span>
+      </div>
+      <div class="progress progress-glass">
+        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" id="settleProgress" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SEARCH & FILTER ===== -->
+  <div class="glass-card mb-4">
+    <div class="card-body-custom">
+      <div class="row g-3 align-items-center">
+        <div class="col-md-6">
+          <div class="search-wrapper">
+            <i class="bi bi-search search-icon"></i>
+            <input type="text" id="searchInput" class="form-control input-glass ps-5" placeholder="Search member by name..." />
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn filter-btn active" data-filter="all">All</button>
+            <button class="btn filter-btn" data-filter="pay">Need to Pay</button>
+            <button class="btn filter-btn" data-filter="receive">Need to Receive</button>
+            <button class="btn filter-btn" data-filter="settled">Settled</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MEMBERS TABLE ===== -->
+  <div class="glass-card mb-4">
+    <div class="card-header-custom d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span><i class="bi bi-table me-2 text-primary"></i> Members</span>
+      <button class="btn btn-primary btn-sm btn-glow" id="addMemberBtn" data-bs-toggle="modal" data-bs-target="#memberModal">
+        <i class="bi bi-person-plus-fill me-1"></i> Add Member
+      </button>
+    </div>
+    <div class="card-body-custom p-0">
+      <div class="table-responsive">
+        <table class="table table-glass mb-0" id="membersTable">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="selectAll" class="form-check-input" /></th>
+              <th>Avatar</th>
+              <th>Name</th>
+              <th>Paid (₹)</th>
+              <th>Share (₹)</th>
+              <th>Balance (₹)</th>
+              <th>Status</th>
+              <th>Settled</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="membersBody">
+            <!-- rows injected by JS -->
+          </tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="empty-state">
+        <i class="bi bi-people display-4 mb-3 text-muted"></i>
+        <p class="text-muted">No members yet. Add your first member!</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CHARTS ROW ===== -->
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="glass-card h-100">
+        <div class="card-header-custom"><i class="bi bi-pie-chart-fill me-2 text-warning"></i> Contribution Chart</div>
+        <div class="card-body-custom d-flex justify-content-center align-items-center">
+          <div style="position:relative;width:100%;max-width:340px;height:300px;">
+            <canvas id="pieChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="glass-card h-100">
+        <div class="card-header-custom"><i class="bi bi-bar-chart-fill me-2 text-info"></i> Balance Overview</div>
+        <div class="card-body-custom d-flex justify-content-center align-items-center">
+          <div style="position:relative;width:100%;height:300px;">
+            <canvas id="barChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== REPORT SECTION ===== -->
+  <div class="glass-card mb-4">
+    <div class="card-header-custom"><i class="bi bi-file-earmark-text-fill me-2 text-success"></i> Expense Report</div>
+    <div class="card-body-custom">
+      <pre id="reportText" class="report-pre"></pre>
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-success btn-glow" id="downloadPdfBtn"><i class="bi bi-file-pdf-fill me-1"></i> Download PDF</button>
+        <button class="btn btn-info btn-glow text-white" id="downloadExcelBtn"><i class="bi bi-file-spreadsheet-fill me-1"></i> Download Excel</button>
+        <button class="btn btn-secondary btn-glow" id="printBtn"><i class="bi bi-printer-fill me-1"></i> Print Report</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ===== ADD/EDIT MEMBER MODAL ===== -->
+<div class="modal fade" id="memberModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content glass-modal">
+      <div class="modal-header border-0">
+        <h5 class="modal-title gradient-text" id="modalTitle">Add Member</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editMemberId" />
+        <div class="mb-3">
+          <label class="form-label label-styled">Name *</label>
+          <input type="text" id="memberName" class="form-control input-glass" placeholder="Enter member name" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label label-styled">Amount Paid (₹)</label>
+          <input type="number" id="memberPaid" class="form-control input-glass" value="0" min="0" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label label-styled">Avatar / Photo URL (optional)</label>
+          <input type="url" id="memberAvatar" class="form-control input-glass" placeholder="https://..." />
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary btn-glow" id="saveMemberBtn">Save Member</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== IMPORT / EXPORT MODAL ===== -->
+<div class="modal fade" id="importExportModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content glass-modal">
+      <div class="modal-header border-0">
+        <h5 class="modal-title gradient-text">Import / Export Data</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body d-flex flex-column gap-3">
+        <button class="btn btn-outline-light btn-glow" id="exportJsonBtn"><i class="bi bi-download me-2"></i> Export as JSON</button>
+        <div>
+          <label class="form-label label-styled">Import JSON</label>
+          <input type="file" id="importJsonFile" class="form-control input-glass" accept=".json" />
+          <button class="btn btn-primary btn-glow mt-2 w-100" id="importJsonBtn"><i class="bi bi-upload me-2"></i> Import JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
